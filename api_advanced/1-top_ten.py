@@ -1,37 +1,25 @@
 #!/usr/bin/python3
-"""Queries the Reddit API and prints the titles of the first 10 hot posts."""
+"""Print the titles of the first 10 hot posts of a subreddit."""
 import requests
+
+HEADERS = {"User-Agent": "linux:alu.api_advanced:v1.0"}
 
 
 def top_ten(subreddit):
-    """Print the titles of the first 10 hot posts of a subreddit.
-
-    Prints None if the subreddit is invalid or unreachable.
-    """
-    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    headers = {"User-Agent": "linux:alu-scripting:v1.0.0 (by /u/alu_student)"}
-    params = {"limit": 10}
-
+    """Print the first 10 hot post titles, or None if invalid."""
+    url = "https://www.reddit.com/r/{}/hot/.json".format(subreddit)
+    response = requests.get(url, headers=HEADERS, params={"limit": 10},
+                            allow_redirects=False)
+    if response.status_code in (301, 302, 404):
+        print(None)
+        return
     try:
-        response = requests.get(url, headers=headers, params=params,
-                                allow_redirects=False, timeout=10)
-    except requests.RequestException:
+        children = response.json().get("data").get("children")
+    except Exception:
         print(None)
         return
-
-    if response.status_code != 200:
+    if not children:
         print(None)
         return
-
-    try:
-        posts = response.json().get("data", {}).get("children", [])
-    except ValueError:
-        print(None)
-        return
-
-    if not posts:
-        print(None)
-        return
-
-    for post in posts:
-        print(post.get("data", {}).get("title"))
+    for child in children[:10]:
+        print(child.get("data").get("title"))

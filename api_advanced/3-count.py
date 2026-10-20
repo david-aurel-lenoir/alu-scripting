@@ -1,34 +1,39 @@
 #!/usr/bin/python3
-"""Module that counts keyword occurrences in Reddit hot post titles."""
+"""Recursively count keywords in the hot post titles of a subreddit."""
 import requests
 
+HEADERS = {"User-Agent": "linux:alu.api_advanced:v1.0"}
 
-def count_words(subreddit, word_list, counts={}, after=None):
-    """Print sorted count of keywords found in hot post titles."""
-    if not counts:
-        counts = {word.lower(): 0 for word in word_list}
+
+def count_words(subreddit, word_list, after=None, counts=None):
+    """Print a sorted count of the given keywords in hot post titles."""
+    if counts is None:
+        counts = {}
+        for word in word_list:
+            counts[word.lower()] = 0
     url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    headers = {"User-Agent": "linux:api_advanced:v1.0 (by /u/stephane_alu)"}
     params = {"limit": 100}
     if after:
         params["after"] = after
-    response = requests.get(
-        url, headers=headers, params=params, allow_redirects=False
-    )
-    if response.status_code != 200:
+    try:
+        res = requests.get(url, headers=HEADERS, params=params,
+                           allow_redirects=False, timeout=10)
+    except Exception:
         return
-    data = response.json().get("data", {})
-    posts = data.get("children", [])
-    for post in posts:
-        title = post.get("data", {}).get("title", "").lower().split()
-        for word in title:
-            if word in counts:
-                counts[word] += 1
-    next_after = data.get("after")
-    if next_after is None:
-        sorted_counts = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        for word, count in sorted_counts:
-            if count > 0:
-                print("{}: {}".format(word, count))
+    if res.status_code != 200:
         return
-    return count_words(subreddit, word_list, counts, next_after)
+    data = res.json().get("data", {})
+    for child in data.get("children", []):
+        title = child.get("data", {}).get("title", "").lower().split()
+        for key in counts:
+            counts[key] += title.count(key)
+    nxt = data.get("after")
+    if nxt is not None:
+        return count_words(subreddit, word_list, nxt, counts)
+    totals = {}
+    for word in word_list:
+        key = word.lower()
+        totals[key] = totals.get(key, 0) + counts.get(key, 0)
+    for key, value in sorted(totals.items(), key=lambda kv: (-kv[1], kv[0])):
+        if value > 0:
+            print("{}: {}".format(key, value))

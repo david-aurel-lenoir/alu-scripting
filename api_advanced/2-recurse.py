@@ -1,27 +1,29 @@
 #!/usr/bin/python3
-"""Module that recursively queries the Reddit API for all hot posts."""
+"""Recursively collect the titles of all hot posts of a subreddit."""
 import requests
+
+HEADERS = {"User-Agent": "linux:alu.api_advanced:v1.0"}
 
 
 def recurse(subreddit, hot_list=[], after=None):
-    """Return a list of titles of all hot articles for a subreddit."""
+    """Return a list of all hot post titles, or None if invalid."""
+    if after is None:
+        hot_list = []
     url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    headers = {"User-Agent": "linux:api_advanced:v1.0 (by /u/stephane_alu)"}
     params = {"limit": 100}
     if after:
         params["after"] = after
-    response = requests.get(
-        url, headers=headers, params=params, allow_redirects=False
-    )
-    if response.status_code != 200:
+    try:
+        res = requests.get(url, headers=HEADERS, params=params,
+                           allow_redirects=False, timeout=10)
+    except Exception:
         return None
-    data = response.json().get("data", {})
-    posts = data.get("children", [])
-    if not posts:
-        return hot_list if hot_list else None
-    for post in posts:
-        hot_list.append(post.get("data", {}).get("title"))
-    next_after = data.get("after")
-    if next_after is None:
+    if res.status_code != 200:
+        return None
+    data = res.json().get("data", {})
+    hot_list = hot_list + [c.get("data", {}).get("title")
+                           for c in data.get("children", [])]
+    nxt = data.get("after")
+    if nxt is None:
         return hot_list
-    return recurse(subreddit, hot_list, next_after)
+    return recurse(subreddit, hot_list, nxt)
